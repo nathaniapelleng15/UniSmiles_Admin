@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { apiBaseUrl } from './urls';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  baseURL: apiBaseUrl,
 });
 
 export interface AuthResponse {

@@ -1,5 +1,11 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL;
+// KroomBox may pass stale VITE_* process variables to production builds. Pin
+// production traffic to the real UniSmiles API; keep dev configurable/local.
+export const apiBaseUrl = import.meta.env.PROD
+  ? 'https://api.uniinside.net/api/v1'
+  : import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const publicBaseUrl = import.meta.env.PROD
+  ? 'https://api.uniinside.net'
+  : import.meta.env.VITE_PUBLIC_BASE_URL;
 
 export function apiOrigin() {
   try {
