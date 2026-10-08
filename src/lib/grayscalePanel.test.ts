@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   grayscaleValue, sharpenGray, boxBlurGray, GRAYSCALE_OPTIONS,
   renderPrintBitmap, previewPlan, MEASURED_FRAME,
@@ -13,9 +15,12 @@ import {
  * karena itu di bawah ini berkas SUMBERNYA dibaca langsung.
  */
 
-const SUMBER = '/Users/nadine/Unismiles/unismiles-photobooth/services/oneBitImage.ts';
-const PRINTER = '/Users/nadine/Unismiles/unismiles-photobooth/services/niimbotPrinter.ts';
-const BACKEND = '/Users/nadine/Unismiles/unismiles-backend/utils/printingConfigValidation.js';
+const ADMIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const PHOTOBOOTH_ROOT = process.env.UNISMILES_PHOTOBOOTH_ROOT || resolve(ADMIN_ROOT, '../photobooth');
+const BACKEND_ROOT = process.env.UNISMILES_BACKEND_ROOT || resolve(ADMIN_ROOT, '../../unismiles-casesafe/backend');
+const SUMBER = resolve(PHOTOBOOTH_ROOT, 'services/oneBitImage.ts');
+const PRINTER = resolve(PHOTOBOOTH_ROOT, 'services/niimbotPrinter.ts');
+const BACKEND = resolve(BACKEND_ROOT, 'utils/printingConfigValidation.js');
 
 test('daftar algoritma panel = daftar di produksi = daftar di backend', () => {
   const prod = readFileSync(SUMBER, 'utf8');

@@ -92,7 +92,7 @@ export const PhotoFilters: React.FC = () => {
   const fetchFilters = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/filters');
+      const response = await api.get('/admin/filters');
       if (response.data && Array.isArray(response.data.data)) {
         setFilters(response.data.data);
       } else if (Array.isArray(response.data)) {
@@ -128,7 +128,7 @@ export const PhotoFilters: React.FC = () => {
         preview_url: filter.preview_url || filter.previewUrl || '',
         description: filter.description || ''
       };
-      await api.put(`/filters/${filter.id}`, payload);
+      await api.put(`/admin/filters/${filter.id}`, payload);
       toast.success(`Filter "${filter.name}" ${updatedActive ? 'enabled' : 'disabled'}.`);
     } catch (error: any) {
       console.error('Failed to toggle filter status:', error);
@@ -142,7 +142,7 @@ export const PhotoFilters: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete filter "${name}"?`)) return;
 
     try {
-      await api.delete(`/filters/${id}`);
+      await api.delete(`/admin/filters/${id}`);
       setFilters(prev => prev.filter(f => f.id !== id));
       toast.success('Filter deleted successfully.');
     } catch (error: any) {
@@ -199,10 +199,10 @@ export const PhotoFilters: React.FC = () => {
       };
 
       if (editingFilter) {
-        await api.put(`/filters/${editingFilter.id}`, payload);
+        await api.put(`/admin/filters/${editingFilter.id}`, payload);
         toast.success('Filter updated successfully.');
       } else {
-        await api.post('/filters', payload);
+        await api.post('/admin/filters', payload);
         toast.success('New filter created successfully.');
       }
 

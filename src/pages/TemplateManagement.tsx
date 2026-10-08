@@ -888,7 +888,7 @@ const FrameEditorModal: React.FC<FrameEditorModalProps> = ({
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-primary">Frame Editor</p>
             <p className="text-xs font-bold text-foreground">
-              {preset.name} ({preset.width}x{preset.height})
+              {preset.label} ({preset.width}x{preset.height})
             </p>
           </div>
         </div>

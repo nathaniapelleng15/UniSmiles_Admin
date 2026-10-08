@@ -30,7 +30,7 @@ import api from '../lib/api';
 
 // --- Types ---
 
-type Role = 'Super Admin' | 'Admin Mitra' | 'Viewer';
+type Role = 'Super Admin' | 'Admin Mitra' | 'Klien';
 
 type ServiceMode = 
   | 'Self-managed' 
@@ -51,6 +51,8 @@ interface UserRecord {
   lastActive: string;
   notes?: string;
 }
+
+type UserFormData = Omit<UserRecord, 'id' | 'lastActive'> & { password: string };
 
 interface RoleDefinition {
   name: Role;
@@ -84,7 +86,7 @@ const DEFAULT_ROLES: RoleDefinition[] = [
     ]
   },
   {
-    name: 'Viewer',
+    name: 'Klien',
     description: 'Read-only account for partners who only need reports.',
     access: [
       'View dashboard', 'View sessions', 'View analytics', 'Export reports'
@@ -141,7 +143,7 @@ const DEFAULT_USERS: UserRecord[] = [
     id: '5',
     name: 'Report Viewer',
     email: 'viewer@client.com',
-    role: 'Viewer',
+    role: 'Klien',
     partner: 'Kafe Senja',
     serviceMode: 'View Only',
     assignedKiosks: ['Kiosk Senja 01'],
@@ -177,6 +179,7 @@ export const UserManager: React.FC = () => {
   // --- State ---
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const [roles] = useState<RoleDefinition[]>(() => {
     const saved = localStorage.getItem(ROLES_STORAGE_KEY);
@@ -194,7 +197,7 @@ export const UserManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All Status');
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Omit<UserRecord, 'id' | 'lastActive'>>({
+  const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
     role: 'Admin Mitra',
@@ -202,7 +205,8 @@ export const UserManager: React.FC = () => {
     serviceMode: 'Self-managed',
     assignedKiosks: [],
     status: 'Active',
-    notes: ''
+    notes: '',
+    password: ''
   });
 
   // --- Effects ---
@@ -213,11 +217,15 @@ export const UserManager: React.FC = () => {
     }
     async function fetchUsers() {
       try {
-        const res = await api.get("/users");
+        setLoadError('');
+        const res = await api.get('/admin/users');
         const data = res.data;
-        setUsers(Array.isArray(data) ? data : (data.data || []));
+        const rows = Array.isArray(data) ? data : data.data;
+        setUsers(Array.isArray(rows) ? rows : []);
       } catch (err) {
         console.error("Error fetching users:", err);
+        setLoadError('Failed to load users. Check your access and try again.');
+        toast.error('Failed to load users.');
       } finally {
         setLoading(false);
       }
@@ -270,7 +278,8 @@ export const UserManager: React.FC = () => {
         serviceMode: user.serviceMode,
         assignedKiosks: user.assignedKiosks,
         status: user.status,
-        notes: user.notes
+        notes: user.notes || '',
+        password: ''
       });
     } else {
       setEditingUser(null);
@@ -282,41 +291,47 @@ export const UserManager: React.FC = () => {
         serviceMode: 'Self-managed',
         assignedKiosks: [],
         status: 'Active',
-        notes: ''
+        notes: '',
+        password: ''
       });
     }
     setIsModalOpen(true);
   };
 
   const handleSaveUser = async () => {
-    if (!formData.name || !formData.email || !formData.role) {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.role) {
       toast.error('Name, Email, and Role are required.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       toast.error('Please enter a valid email.');
       return;
     }
-    if ((formData.role === 'Admin Mitra' || formData.role === 'Viewer') && !formData.partner) {
+    if (!editingUser && (formData.password.length < 10 || formData.password.length > 128)) {
+      toast.error('Initial password must contain 10 to 128 characters.');
+      return;
+    }
+    if ((formData.role === 'Admin Mitra' || formData.role === 'Klien') && !formData.partner.trim()) {
       toast.error('Partner name is required for this role.');
       return;
     }
 
     // Check duplicate email
-    const duplicate = users.find(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser?.id);
+    const duplicate = users.find(u => u.email.toLowerCase() === formData.email.trim().toLowerCase() && u.id !== editingUser?.id);
     if (duplicate) {
       toast.error('User with this email already exists.');
       return;
     }
 
+    const { password, ...userPayload } = formData;
     try {
       if (editingUser) {
-        const res = await api.put(`/users/${editingUser.id}`, formData);
+        const res = await api.put(`/admin/users/${editingUser.id}`, userPayload);
         const updated = res.data.data || res.data;
         setUsers(users.map(u => u.id === editingUser.id ? updated : u));
         toast.success('User updated successfully.');
       } else {
-        const res = await api.post("/users", formData);
+        const res = await api.post('/admin/users', { ...userPayload, password });
         const newUser = res.data.data || res.data;
         setUsers([...users, newUser]);
         toast.success('User added successfully.');
@@ -324,7 +339,7 @@ export const UserManager: React.FC = () => {
       setIsModalOpen(false);
     } catch (err) {
       console.error("Error saving user:", err);
-      toast.error("Failed to save user.");
+      toast.error((err as any)?.response?.data?.message || 'Failed to save user.');
     }
   };
 
@@ -339,7 +354,7 @@ export const UserManager: React.FC = () => {
 
     if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
       try {
-        await api.delete(`/users/${id}`);
+        await api.delete(`/admin/users/${id}`);
         setUsers(users.filter(u => u.id !== id));
         toast.success('User deleted.');
       } catch (err) {
@@ -353,8 +368,13 @@ export const UserManager: React.FC = () => {
     const user = users.find(u => u.id === id);
     if (!user) return;
     const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
+    if (user.role === 'Super Admin' && newStatus === 'Inactive'
+      && users.filter(u => u.role === 'Super Admin' && u.status === 'Active').length <= 1) {
+      toast.error('Cannot disable the last active Super Admin.');
+      return;
+    }
     try {
-      const res = await api.put(`/users/${id}`, { status: newStatus });
+      const res = await api.put(`/admin/users/${id}`, { status: newStatus });
       const updated = res.data.data || res.data;
       setUsers(users.map(u => u.id === id ? updated : u));
       toast.success('Status updated.');
@@ -364,7 +384,7 @@ export const UserManager: React.FC = () => {
   };
 
   const resetPassword = (email: string) => {
-    toast.info(`Password reset link generated successfully for ${email}.`);
+    toast.error(`Password reset is not connected to a backend flow for ${email}.`);
   };
 
   const currentSimUser = users.find(u => u.name === currentUserSim) || users[0] || {
@@ -443,7 +463,7 @@ export const UserManager: React.FC = () => {
                 <option value="All Roles" className="bg-[#1E293B]">All Roles</option>
                 <option value="Super Admin" className="bg-[#1E293B]">Super Admin</option>
                 <option value="Admin Mitra" className="bg-[#1E293B]">Admin Mitra</option>
-                <option value="Viewer" className="bg-[#1E293B]">Viewer</option>
+                <option value="Klien" className="bg-[#1E293B]">Klien</option>
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
             </div>
@@ -476,7 +496,13 @@ export const UserManager: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredUsers.map((user) => (
+              {loading ? (
+                <tr><td colSpan={5} className="px-8 py-12 text-center text-xs font-bold text-muted">Loading users…</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={5} className="px-8 py-12 text-center text-xs font-bold text-red-400">{loadError}</td></tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr><td colSpan={5} className="px-8 py-12 text-center text-xs font-bold text-muted">No users match this filter.</td></tr>
+              ) : filteredUsers.map((user) => (
                 <tr 
                   key={user.id} 
                   className={cn(
@@ -519,10 +545,10 @@ export const UserManager: React.FC = () => {
                           "text-[9px] font-black uppercase tracking-widest",
                           user.status === 'Active' ? "text-emerald-400" : "text-muted"
                         )}>
-                          {user.status === 'Active' ? 'Verified Online' : 'System Offline'}
+                          {user.status === 'Active' ? 'Access Enabled' : 'Access Disabled'}
                         </span>
                       </div>
-                      <span className="text-[8px] text-muted font-black uppercase opacity-40">Sync: {user.lastActive}</span>
+                      <span className="text-[8px] text-muted font-black uppercase opacity-40">Updated: {user.lastActive || '—'}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5 text-right">
@@ -597,7 +623,7 @@ export const UserManager: React.FC = () => {
                     <th className="px-6 py-5 rounded-tl-3xl">System Module</th>
                     <th className="px-6 py-5 text-center">Super Admin</th>
                     <th className="px-6 py-5 text-center">Admin Mitra</th>
-                    <th className="px-6 py-5 text-center rounded-tr-3xl">Viewer</th>
+                    <th className="px-6 py-5 text-center rounded-tr-3xl">Klien</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -670,7 +696,7 @@ export const UserManager: React.FC = () => {
                 <p className="text-[11px] text-muted leading-relaxed font-bold uppercase tracking-wider">
                   {currentSimUser.role === 'Super Admin' && "Governance Node: Full administrative authority over all partners, kiosks, users, systems, and cryptographic protocols."}
                   {currentSimUser.role === 'Admin Mitra' && "Partner Node: Restricted authority limited to owned business vertical, assigned kiosk infrastructure, and local assets."}
-                  {currentSimUser.role === 'Viewer' && "Observer Node: Read-only access to analytics telemetry without modification privileges to platform state."}
+                  {currentSimUser.role === 'Klien' && "Observer Node: Read-only access to analytics telemetry without modification privileges to platform state."}
                 </p>
                 <div className="pt-4 border-t border-white/5">
                   <div className="text-[8px] font-black text-muted uppercase tracking-[0.3em] mb-4">Core Privileges:</div>
@@ -743,6 +769,18 @@ export const UserManager: React.FC = () => {
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/40 text-sm font-bold"
                   />
                 </div>
+                {!editingUser && <div className="space-y-2">
+                  <label className="text-[10px] font-extrabold text-muted uppercase tracking-widest">Initial Password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={10}
+                    maxLength={128}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/40 text-sm font-bold"
+                  />
+                </div>}
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-extrabold text-muted uppercase tracking-widest">Role</label>
@@ -761,7 +799,7 @@ export const UserManager: React.FC = () => {
                     >
                       <option value="Super Admin">Super Admin</option>
                       <option value="Admin Mitra">Admin Mitra</option>
-                      <option value="Viewer">Viewer</option>
+                      <option value="Klien">Klien</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
                   </div>

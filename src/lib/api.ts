@@ -32,15 +32,7 @@ export const parseAuthResponse = (payload: unknown): AuthResponse => {
   return { token, user };
 };
 
-export const getAuthUser = (payload: unknown): Record<string, unknown> | null => {
-  if (!payload || typeof payload !== 'object') return null;
-  const body = payload as Record<string, unknown>;
-  const data = body.data && typeof body.data === 'object'
-    ? body.data as Record<string, unknown>
-    : null;
-  const user = body.user ?? data?.user ?? data ?? body;
-  return user && typeof user === 'object' ? user as Record<string, unknown> : null;
-};
+export { getAuthUser } from './authUser';
 
 api.interceptors.request.use(
   (config) => {

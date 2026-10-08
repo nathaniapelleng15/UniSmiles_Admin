@@ -26,7 +26,7 @@ export const Auth: React.FC = () => {
         password,
       });
       const { token, user: responseUser } = parseAuthResponse(response.data);
-      let user = responseUser as unknown as User | undefined;
+      let user: User | null = responseUser ? getAuthUser({ user: responseUser }) : null;
 
       // Some backend versions return the token first and expose the profile
       // only through /auth/me. Fetch it before marking the session complete.
@@ -34,7 +34,7 @@ export const Auth: React.FC = () => {
         const meResponse = await api.get('/auth/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        user = getAuthUser(meResponse.data) as unknown as User | null;
+        user = getAuthUser(meResponse.data);
       }
 
       if (!user) {

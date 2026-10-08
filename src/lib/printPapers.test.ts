@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   PAPER_CATALOG, MEASURED_FRAME, PRINTHEAD_PX, DPI, effectiveSourceDpi,
   mmToPx, pxToMm, printBox, drawRect, previewPlan, effectiveMargin,
@@ -36,16 +38,19 @@ test('ukuran kanvas = ukuran kertas pada 300 dpi, tidak dipangkas', () => {
   }
 });
 
+const ADMIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const PHOTOBOOTH_ROOT = process.env.UNISMILES_PHOTOBOOTH_ROOT || resolve(ADMIN_ROOT, '../photobooth');
+const BACKEND_ROOT = process.env.UNISMILES_BACKEND_ROOT || resolve(ADMIN_ROOT, '../../unismiles-casesafe/backend');
+
 // --- Test silang terhadap SUMBER, bukan terhadap salinannya sendiri ---
-//
 // Panel menyalin geometri photobooth. Salinan yang diuji terhadap dirinya sendiri
 // akan selalu hijau walau angka aslinya berubah. Karena itu di sini dibaca
 // berkas sumbernya, dan angka di preview harus cocok dengannya.
 
 test('kotak cetak Polaroid SNS cocok dengan sumber photobooth dan backend', async () => {
   const { readFileSync } = await import('node:fs');
-  const geo = readFileSync('/Users/nadine/Unismiles/unismiles-photobooth/services/labelGeometry.ts', 'utf8');
-  const be = readFileSync('/Users/nadine/Unismiles/unismiles-backend/utils/paperSizes.js', 'utf8');
+  const geo = readFileSync(resolve(PHOTOBOOTH_ROOT, 'services/labelGeometry.ts'), 'utf8');
+  const be = readFileSync(resolve(BACKEND_ROOT, 'utils/paperSizes.js'), 'utf8');
 
   // 1. Sumbernya sendiri masih memuat angka yang diukur.
   assert.match(geo, /'nimbotpaper-polaroid': \{ topPx: 70, rightPx: 83, leftPx: 0, bottomPx: 154, fitMode: 'cover' \}/,
